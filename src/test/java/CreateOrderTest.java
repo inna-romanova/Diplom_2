@@ -1,14 +1,20 @@
 import io.qameta.allure.Description;
 import io.qameta.allure.junit4.DisplayName;
+import io.restassured.response.ValidatableResponse;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import utils.Credential;
 import steps.OrderSteps;
 import steps.UserSteps;
+import utils.ErrorMessages;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import static org.apache.http.HttpStatus.*;
+import static org.hamcrest.CoreMatchers.equalTo;
+import static org.hamcrest.CoreMatchers.notNullValue;
 
 public class CreateOrderTest {
     private final String email = Credential.EMAIL;
@@ -22,7 +28,7 @@ public class CreateOrderTest {
 
     @Before
     public void createUser() {
-        userSteps.createUser(email, password, name, 200);
+        userSteps.createUser(email, password, name);
     }
 
     @Test
@@ -31,7 +37,13 @@ public class CreateOrderTest {
     public void createOrderWithIngredientsByLoggedUser() {
         String token = userSteps.getToken(email, password);
         ArrayList<String> ingredients = orderSteps.getIngredients();
-        orderSteps.createOrder(ingredients, 200, token);
+        System.out.println("Ingredients: " + ingredients);
+        ValidatableResponse response = orderSteps.createOrder(ingredients, token);
+        response
+                .statusCode(SC_OK)
+                .body("success", equalTo(true))
+                .body("name", notNullValue())
+                .body("order.number", notNullValue());
     }
 
     @Test
@@ -39,7 +51,12 @@ public class CreateOrderTest {
     @Description("Заказ создается")
     public void createOrderWithIngredientsByNotLoggedUser() {
         ArrayList<String>  ingredients = orderSteps.getIngredients();
-        orderSteps.createOrder(ingredients, 200, "");
+        ValidatableResponse response = orderSteps.createOrder(ingredients, "");
+        response
+                .statusCode(SC_OK)
+                .body("success", equalTo(true))
+                .body("name", notNullValue())
+                .body("order.number", notNullValue());
     }
 
     @Test
@@ -47,14 +64,22 @@ public class CreateOrderTest {
     @Description("Заказ создается")
     public void createOrderWithoutIngredientsByLoggedUser() {
         String token = userSteps.getToken(email, password);
-        orderSteps.createOrder(emptyIngredients, 400, token);
+        ValidatableResponse response = orderSteps.createOrder(emptyIngredients, token);
+        response
+                .statusCode(SC_BAD_REQUEST)
+                .body("success", equalTo(false))
+                .body("message", equalTo(ErrorMessages.INGREDIENT_REQUIRED_ERROR_MSG));
     }
 
     @Test
     @DisplayName("Создание заказа неавторизованным пользователем без ингредиентов")
     @Description("Заказ не создается")
     public void createOrderWithoutIngredientsByNotLoggedUser() {
-        orderSteps.createOrder(emptyIngredients, 400, "");
+        ValidatableResponse response = orderSteps.createOrder(emptyIngredients, "");
+        response
+                .statusCode(SC_BAD_REQUEST)
+                .body("success", equalTo(false))
+                .body("message", equalTo(ErrorMessages.INGREDIENT_REQUIRED_ERROR_MSG));
     }
 
     @Test
@@ -63,7 +88,11 @@ public class CreateOrderTest {
     public void createOrderWithWrongHashIngredientByLoggedUser() {
         String token = userSteps.getToken(email, password);
         ArrayList<String> ingredients = new ArrayList<>(List.of(invalidIngredientHash));
-        orderSteps.createOrder(ingredients, 400, token);
+        ValidatableResponse response = orderSteps.createOrder(ingredients, token);
+        response
+                .statusCode(SC_BAD_REQUEST)
+                .body("success", equalTo(false))
+                .body("message", equalTo(ErrorMessages.INVALID_INGREDIENT_HASH_ERROR_MSG));
     }
 
     @Test
@@ -71,7 +100,11 @@ public class CreateOrderTest {
     @Description("Заказ не создается")
     public void createOrderWithWrongHashIngredientByNotLoggedUser() {
         ArrayList<String> ingredients = new ArrayList<>(List.of(invalidIngredientHash));
-        orderSteps.createOrder(ingredients, 400, "");
+        ValidatableResponse response = orderSteps.createOrder(ingredients, "");
+        response
+                .statusCode(SC_BAD_REQUEST)
+                .body("success", equalTo(false))
+                .body("message", equalTo(ErrorMessages.INVALID_INGREDIENT_HASH_ERROR_MSG));
     }
 
     @After

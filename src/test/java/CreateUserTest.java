@@ -1,10 +1,16 @@
 import io.qameta.allure.Description;
 import io.qameta.allure.junit4.DisplayName;
+import io.restassured.response.ValidatableResponse;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import utils.Credential;
 import steps.UserSteps;
+import utils.ErrorMessages;
+
+import static org.apache.http.HttpStatus.*;
+import static org.hamcrest.CoreMatchers.equalTo;
+import static org.hamcrest.CoreMatchers.notNullValue;
 
 public class CreateUserTest {
 
@@ -17,21 +23,29 @@ public class CreateUserTest {
 
     @BeforeClass
     public static void createUser() {
-        userSteps.createUser(email, password, name, 200);
+        userSteps.createUser(email, password, name);
     }
 
     @Test
     @DisplayName("Создание уникального пользователя")
     @Description("Уникальный пользователь создается без ошибок")
     public void createUniqueUser() {
-        userSteps.createUser(uniqueEmail, password, name, 200);
+        ValidatableResponse response = userSteps.createUser(uniqueEmail, password, name);
+        response
+                .statusCode(SC_OK)
+                .body("success", equalTo(true))
+                .body("user", notNullValue());
     }
 
     @Test
     @DisplayName("Создание существующего пользователя")
     @Description("Пользователь не создается повторно")
     public void createAlreadyExistedUser() {
-        userSteps.createUser(email, password, name, 403);
+        ValidatableResponse response = userSteps.createUser(email, password, name);
+        response
+                .statusCode(SC_FORBIDDEN)
+                .body("success", equalTo(false))
+                .body("message", equalTo(ErrorMessages.EXISTED_USER_ERROR_MSG));
     }
 
     @AfterClass
